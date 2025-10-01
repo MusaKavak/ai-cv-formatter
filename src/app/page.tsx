@@ -1,103 +1,118 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+import React, { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { DocxPreview } from "@/components/DocxPreview";
+import docxReplaceText from "@/lib/docx-replace-text";
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+export default function ReplaceDocxPage() {
+    const [file, setFile] = useState<File | null>(null);
+    const [filePreview, setFilePreview] = useState<Blob | null>(null);
+    const [findText, setFindText] = useState<string>("");
+    const [replaceText, setReplaceText] = useState<string>("");
+    const [modifiedFile, setModifiedFile] = useState<Blob | null>(null);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const selectedFile = e.target.files[0];
+            setFile(selectedFile);
+            setFilePreview(new Blob([selectedFile], { type: selectedFile.type }));
+            setModifiedFile(null);
+        } else {
+            setFile(null);
+            setFilePreview(null);
+            setModifiedFile(null);
+        }
+    };
+
+    const handleReplace = async () => {
+        if (!file) {
+            alert("Please select a .docx file");
+            return;
+        }
+
+        const blob = await docxReplaceText(file, findText, replaceText, "Cambria", 10)
+
+
+        setModifiedFile(blob);
+    };
+
+    const handleDownload = () => {
+        if (!modifiedFile) {
+            alert("No modified file to download. Please replace text first.");
+            return;
+        }
+
+        const a = document.createElement("a");
+        const downloadUrl = URL.createObjectURL(modifiedFile);
+        a.href = downloadUrl;
+        a.download = "output.docx";
+        a.click();
+        URL.revokeObjectURL(downloadUrl);
+    };
+
+    return (
+        <div className="flex h-screen">
+            <div className="w-1/3 p-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Upload and Replace Text</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <label>Select DOCX file:</label>
+                            <Input type="file" accept=".docx" onChange={handleFileChange} />
+                        </div>
+                        <div>
+                            <label>Find:</label>
+                            <Input
+                                type="text"
+                                value={findText}
+                                onChange={(e) => setFindText(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label>Replace with:</label>
+                            <Input
+                                type="text"
+                                value={replaceText}
+                                onChange={(e) => setReplaceText(e.target.value)}
+                            />
+                        </div>
+                        <Button onClick={handleReplace}>Replace</Button>
+                        <Button onClick={handleDownload} disabled={!modifiedFile}>Download</Button>
+                    </CardContent>
+                </Card>
+            </div>
+            <div className="w-2/3 flex p-4 border-l">
+                <div className="w-1/2 pr-2">
+                    <h2 className="text-lg font-semibold mb-4">Original</h2>
+                    <div className="h-full border rounded-md p-2">
+                        {filePreview ? (
+                            <DocxPreview file={filePreview} />
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500">
+                                Upload a file to see the preview
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <div className="w-1/2 pl-2">
+                    <h2 className="text-lg font-semibold mb-4">Modified</h2>
+                    <div className="h-full border rounded-md p-2">
+                        {modifiedFile ? (
+                            <DocxPreview file={modifiedFile} />
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500">
+                                Replace text to see the preview
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+    );
 }
