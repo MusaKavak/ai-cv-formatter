@@ -6,13 +6,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DocxPreview } from "@/components/DocxPreview";
 import docxReplaceText from "@/lib/docx-replace-text";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
+import { Textarea } from "@/components/ui/textarea";
+import { ModelProvider, Models } from "@/models/ModelProvider";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { aiRequest } from "@/lib/ai-request";
+import { docxExtractText } from "@/lib/docx-extract-text";
 
 export default function ReplaceDocxPage() {
     const [file, setFile] = useState<File | null>(null);
+    const [jobDescription, setJobDescription] = useState("");
     const [filePreview, setFilePreview] = useState<Blob | null>(null);
     const [findText, setFindText] = useState<string>("");
     const [replaceText, setReplaceText] = useState<string>("");
+    const [font, setFont] = useState<string>("Cambria");
+    const [fontSize, setFontSize] = useState<string>("10");
     const [modifiedFile, setModifiedFile] = useState<Blob | null>(null);
+    const [apiKey, setApiKey] = useState("")
+    const [modelProvider, setProvider] = useState<ModelProvider>("openai")
+    const [model, setModel] = useState(Models["openai"][0])
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -33,10 +46,20 @@ export default function ReplaceDocxPage() {
             return;
         }
 
-        const blob = await docxReplaceText(file, findText, replaceText, "Cambria", 10)
+        const result = await aiRequest(
+            await docxExtractText(file),
+            jobDescription,
+            modelProvider,
+            model,
+            apiKey
+        )
 
+        console.log(result)
 
-        setModifiedFile(blob);
+        // const replacements = { [findText]: replaceText };
+        // const blob = await docxReplaceText(file, replacements, font, parseInt(fontSize));
+
+        // setModifiedFile(blob);
     };
 
     const handleDownload = () => {
@@ -54,65 +77,132 @@ export default function ReplaceDocxPage() {
     };
 
     return (
-        <div className="flex h-screen">
-            <div className="w-1/3 p-4">
-                <Card>
+        <ResizablePanelGroup direction="horizontal" className="min-h-screen">
+            <ResizablePanel defaultSize={30} className="p-3">
+                <Card className="h-full">
                     <CardHeader>
                         <CardTitle>Upload and Replace Text</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div>
-                            <label>Select DOCX file:</label>
+
+                        <SelectGroup className="space-y-2">
+                            <Label>Select DOCX file:</Label>
                             <Input type="file" accept=".docx" onChange={handleFileChange} />
-                        </div>
-                        <div>
-                            <label>Find:</label>
+                        </SelectGroup>
+
+                        <SelectGroup className="space-y-2">
+                            <Label>Job Description</Label>
+                            <Textarea
+                                placeholder="Paste the job description."
+                                className="h-40" value={jobDescription}
+                                onChange={(e) => setJobDescription(e.target.value)}
+                            />
+                        </SelectGroup>
+
+                        <SelectGroup className="space-y-2">
+                            <Label>Font:</Label>
                             <Input
                                 type="text"
-                                value={findText}
-                                onChange={(e) => setFindText(e.target.value)}
-                                required
+                                value={font}
+                                onChange={(e) => setFont(e.target.value)}
                             />
-                        </div>
-                        <div>
-                            <label>Replace with:</label>
+                        </SelectGroup>
+
+                        <SelectGroup className="space-y-2">
+                            <Label>Font Size:</Label>
                             <Input
-                                type="text"
-                                value={replaceText}
-                                onChange={(e) => setReplaceText(e.target.value)}
+                                type="number"
+                                value={fontSize}
+                                onChange={(e) => setFontSize(e.target.value)}
                             />
+                        </SelectGroup>
+
+                        <SelectGroup className="space-y-2">
+                            <Label>API Key</Label>
+                            <Input
+                                type="password"
+                                value={apiKey}
+                                onChange={(e) => setApiKey(e.target.value)}
+                                placeholder="Enter your API key"
+                            />
+                        </SelectGroup>
+
+                        <SelectGroup className="space-y-2">
+                            <Label>Provider</Label>
+                            <Select
+                                value={modelProvider}
+                                onValueChange={(val: ModelProvider) => {
+                                    setProvider(val)
+                                    setModel(Models[val][0])
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select provider" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="openai">OpenAI</SelectItem>
+                                    <SelectItem value="google">Google Gemini</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </SelectGroup>
+
+                        <SelectGroup className="space-y-2">
+                            <Label>Model</Label>
+                            <Select value={model} onValueChange={setModel}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select model" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {Models[modelProvider].map((m) => (
+                                        <SelectItem key={m} value={m}>
+                                            {m}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </SelectGroup>
+
+                        <div className="flex gap-3 justify-end">
+                            <Button onClick={handleReplace}>Replace</Button>
+                            <Button onClick={handleDownload} disabled={!modifiedFile}>Download</Button>
                         </div>
-                        <Button onClick={handleReplace}>Replace</Button>
-                        <Button onClick={handleDownload} disabled={!modifiedFile}>Download</Button>
+
                     </CardContent>
                 </Card>
-            </div>
-            <div className="w-2/3 flex p-4 border-l">
-                <div className="w-1/2 pr-2">
-                    <h2 className="text-lg font-semibold mb-4">Original</h2>
-                    <div className="h-full border rounded-md p-2">
-                        {filePreview ? (
-                            <DocxPreview file={filePreview} />
-                        ) : (
-                            <div className="flex items-center justify-center h-full text-gray-500">
-                                Upload a file to see the preview
-                            </div>
-                        )}
-                    </div>
-                </div>
-                <div className="w-1/2 pl-2">
-                    <h2 className="text-lg font-semibold mb-4">Modified</h2>
-                    <div className="h-full border rounded-md p-2">
-                        {modifiedFile ? (
-                            <DocxPreview file={modifiedFile} />
-                        ) : (
-                            <div className="flex items-center justify-center h-full text-gray-500">
-                                Replace text to see the preview
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={70}>
+                <ResizablePanelGroup direction="vertical">
+                    <ResizablePanel defaultSize={40} className="p-3">
+                        <div className="flex justify-between flex-wrap">
+                            <h2 className="text-lg font-semibold mb-4">Original</h2>
+                            <p className="text-xs">*The preview may not be correct</p>
+                        </div>
+                        <div className="max-h-full border rounded-md p-2 overflow-auto">
+                            {filePreview ? (
+                                <DocxPreview file={filePreview} />
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-gray-500">
+                                    Upload a file to see the preview
+                                </div>
+                            )}
+                        </div>
+                    </ResizablePanel>
+                    <ResizableHandle withHandle />
+                    <ResizablePanel defaultSize={60} className="p-3">
+                        <h2 className="text-lg font-semibold mb-4">Modified</h2>
+                        <div className="max-h-full border rounded-md p-2 overflow-auto">
+                            {modifiedFile ? (
+                                <DocxPreview file={modifiedFile} />
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-gray-500">
+                                    Replace text to see the preview
+                                </div>
+                            )}
+                        </div>
+                    </ResizablePanel>
+                </ResizablePanelGroup>
+            </ResizablePanel>
+        </ResizablePanelGroup>
     );
 }

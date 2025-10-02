@@ -244,27 +244,28 @@ function processParagraph(
 
 /**
  * Replaces text in a DOCX file with Markdown-formatted content
- * 
+ *
  * This function:
  * 1. Opens the DOCX file (which is a ZIP archive)
  * 2. Extracts and parses the document.xml file
- * 3. Searches for the specified text in all paragraphs
+ * 3. Searches for specified text in all paragraphs
  * 4. Replaces found text with formatted segments
  * 5. Rebuilds and returns the modified DOCX
- * 
+ *
  * @param file - Input DOCX file
- * @param find - Text to search for (case-sensitive)
- * @param replace - Markdown-formatted replacement text
+ * @param replacements - A map of text to find and its Markdown-formatted replacement
  * @param fontFamily - Optional font family to apply to all replacement text (e.g., "Arial", "Times New Roman")
  * @param fontSize - Optional font size to apply to all replacement text (e.g., 10, 32)
  * @returns Promise resolving to modified DOCX as Blob
- * 
+ *
  * @example
  * ```typescript
  * const docx = await docxReplaceText(
- *     file, 
- *     "Hello", 
- *     "**Bold** and *italic* text",
+ *     file,
+ *     {
+ *         "Hello": "**Bold** and *italic* text",
+ *         "World": "__Underlined__"
+ *     },
  *     "Arial",
  *     10
  * );
@@ -272,8 +273,7 @@ function processParagraph(
  */
 async function docxReplaceText(
     file: File,
-    find: string,
-    replace: string,
+    replacements: { [key: string]: string },
     fontFamily?: string,
     fontSize?: number
 ): Promise<Blob> {
@@ -290,26 +290,34 @@ async function docxReplaceText(
     // Step 3: Parse XML to JavaScript object
     const docObj = await parseStringPromise(docXml);
 
-    // Step 4: Parse the markdown replacement text
-    const replacementFormats = parseMarkdown(replace);
+    // Step 4: Parse all markdown replacement strings
+    const parsedReplacements: { [key: string]: TextFormat[] } = {};
+    for (const find in replacements) {
+        const replace = replacements[find];
+        const replacementFormats = parseMarkdown(replace);
 
-    // Apply font family to all segments if specified
-    if (fontFamily) {
-        replacementFormats.forEach(format => {
-            format.fontFamily = fontFamily;
-        });
+        // Apply font family to all segments if specified
+        if (fontFamily) {
+            replacementFormats.forEach(format => {
+                format.fontFamily = fontFamily;
+            });
+        }
+
+        // Apply font size to all segments if specified
+        if (fontSize) {
+            replacementFormats.forEach(format => {
+                format.fontSize = fontSize;
+            });
+        }
+        parsedReplacements[find] = replacementFormats;
     }
 
-    // Apply font size to all segments if specified
-    if (fontSize) {
-        replacementFormats.forEach(format => {
-            format.fontSize = fontSize;
-        });
-    }
 
     // Step 5: Walk through all paragraphs and perform replacements
     walkParagraphs(docObj, (paragraph) => {
-        processParagraph(paragraph, find, replacementFormats);
+        for (const find in parsedReplacements) {
+            processParagraph(paragraph, find, parsedReplacements[find]);
+        }
     });
 
     // Step 6: Convert modified object back to XML
