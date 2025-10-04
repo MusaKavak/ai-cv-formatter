@@ -15,6 +15,7 @@ import { aiRequest } from "@/lib/ai-request";
 import { docxExtractText } from "@/lib/docx-extract-text";
 import { CVAnalysis } from "@/models/CVAnalysisSchema";
 import { Spinner } from "@/components/ui/shadcn-io/spinner";
+import { ThemeToggleButton } from "@/components/ThemeToggleButton";
 
 export default function ReplaceDocxPage() {
     const [file, setFile] = useState<File | null>(null);
@@ -123,7 +124,10 @@ export default function ReplaceDocxPage() {
             <ResizablePanel defaultSize={30} className="p-3">
                 <Card className="h-full overflow-y-auto">
                     <CardHeader>
-                        <CardTitle>Upload and Replace Text</CardTitle>
+                        <CardTitle className="flex justify-between align-middle">
+                            <div className="h-min">Unfuck My CV</div>
+                            <ThemeToggleButton />
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
 
@@ -252,11 +256,11 @@ export default function ReplaceDocxPage() {
                             {analysis?.improvements && analysis.improvements.map((imp) => (
                                 <div key={imp.id} className="space-y-3">
                                     <Textarea
-                                        className="bg-red-50 h-30"
+                                        className="bg-red-50 dark:border-red-800 dark:border-3 h-30"
                                         value={imp.originalText}
                                         onChange={(e) => handleImprovementUpdate('originalText', imp, e.target.value)} />
                                     <Textarea
-                                        className="bg-green-50 h-30"
+                                        className="bg-green-50 dark:border-green-800 dark:border-3 h-30"
                                         value={imp.suggestion}
                                         onChange={(e) => handleImprovementUpdate('suggestion', imp, e.target.value)} />
                                     <div className="flex justify-end gap-3">
